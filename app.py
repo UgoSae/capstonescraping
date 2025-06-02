@@ -26,6 +26,9 @@ st.title("🎤 Analisis Public Speaking dari Video YouTube Berjudul Contoh Latih
 # ------------------------
 video_id = "eZy8ESSjbrQ"
 segmen = list(col.find({"video_id": video_id}))
+if not segmen:
+    st.error(f"Tidak ditemukan data untuk video_id: {video_id}")
+    st.stop()
 
 # ------------------------
 # Analisis Kata, Filler, Sentimen
@@ -45,7 +48,11 @@ kata_freq = Counter(kata_bersih).most_common(20)
 # Wordcloud
 # ------------------------
 st.subheader("☁️ WordCloud dari Transkrip")
+
 def tampilkan_wordcloud(kata):
+    if not kata:
+        st.warning("Data kata kosong. Tidak dapat membuat WordCloud.")
+        return
     wc = WordCloud(width=800, height=400, background_color='white').generate(" ".join(kata))
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.imshow(wc, interpolation='bilinear')
