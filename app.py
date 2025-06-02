@@ -1,3 +1,4 @@
+# app.py
 import streamlit as st
 from pymongo import MongoClient
 from collections import Counter
@@ -7,8 +8,7 @@ import matplotlib.pyplot as plt
 # ------------------------
 # MongoDB Setup
 # ------------------------
-mongo_uri = st.secrets["mongo"]["uri"]  # Gunakan secrets.toml
-
+mongo_uri = st.secrets["mongo"]["uri"]
 client = MongoClient(mongo_uri)
 db = client["scrapingbig"]
 col = db["users"]
@@ -42,36 +42,48 @@ for s in segmen:
 
 kata_freq = Counter(kata_bersih).most_common(20)
 
+# Debugging output
+st.write("🛠️ Jumlah total kata bersih:", len(kata_bersih))
+st.write("🛠️ Contoh 10 kata bersih:", kata_bersih[:10])
+st.write("🛠️ Hasil join kata:", repr(" ".join(kata_bersih)))
+
 # ------------------------
 # Wordcloud
 # ------------------------
 st.subheader("☁️ WordCloud dari Transkrip")
 
 def tampilkan_wordcloud(kata):
-    # Filter kata yang valid (string dan bukan kosong)
-    kata_filter = [k for k in kata if isinstance(k, str) and k.strip()]
-    if not kata_filter:
-        st.warning("Data kata kosong atau tidak valid. Tidak dapat membuat WordCloud.")
+    # Validasi kata yang benar-benar bersih
+    kata_valid = [k for k in kata if isinstance(k, str) and k.strip()]
+    if not kata_valid:
+        st.warning("❗Data kata kosong atau tidak valid. Tidak bisa membuat WordCloud.")
         return
-    wc = WordCloud(width=800, height=400, background_color='white').generate(" ".join(kata_filter))
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.imshow(wc, interpolation='bilinear')
-    ax.axis("off")
-    st.pyplot(fig)
 
-st.write("Jumlah kata bersih:", len(kata_bersih))
-st.write("Contoh kata bersih:", kata_bersih[:10])
+    teks = " ".join(kata_valid).strip()
+    if not teks:
+        st.warning("❗Setelah digabung, teks kosong. Tidak bisa membuat WordCloud.")
+        return
 
-if kata_bersih:
-    tampilkan_wordcloud(kata_bersih)
-else:
-    st.warning("❗Data kata bersih kosong. Tidak bisa membuat WordCloud.")
+    try:
+        wc = WordCloud(width=800, height=400, background_color='white').generate(teks)
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.imshow(wc, interpolation='bilinear')
+        ax.axis("off")
+        st.pyplot(fig)
+    except ValueError as e:
+        st.error(f"Terjadi error saat membuat WordCloud: {e}")
+
+tampilkan_wordcloud(kata_bersih)
 
 # ------------------------
 # Trending Topic
 # ------------------------
 st.subheader("📈 20 Kata Paling Sering Muncul")
+
 def tampilkan_chart(kata_freq):
+    if not kata_freq:
+        st.warning("Tidak ada kata untuk ditampilkan.")
+        return
     kata, jumlah = zip(*kata_freq)
     fig, ax = plt.subplots()
     ax.barh(kata, jumlah, color='skyblue')
