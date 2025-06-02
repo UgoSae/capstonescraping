@@ -1,150 +1,173 @@
-# app.py
 import streamlit as st
-from youtube_transcript_api import YouTubeTranscriptApi
+from pymongo import MongoClient
+from collections import Counter
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
-from collections import Counter
-from pymongo import MongoClient
+from youtube_transcript_api import YouTubeTranscriptApi
 import re
-import string
-import nltk
-from nltk.corpus import stopwords
 
-nltk.download('stopwords')
+# ------------------------
+# Koneksi MongoDB Atlas
+# ------------------------
+client = MongoClient(st.secrets["MONGODB_URI"])
+db = client["present_db"]
+col = db["segmen_transkrip"]
 
-# ----------------------------
-# Konfigurasi MongoDB Atlas
-# ----------------------------
-mongo_uri = st.secrets["mongo"]["uri"]
-client = MongoClient(mongo_uri)
-db = client["scrapingbig"]
-col = db["users"]
+# ------------------------
+# Stopwords & Filler Words
+# ------------------------
+stopwords_id = {
+    'yang', 'dan', 'di', 'ke', 'dari', 'pada', 'untuk', 'dengan', 'akan',
+    'ini', 'itu', 'adalah', 'atau', 'juga', 'karena', 'sudah', 'sebagai',
+    'oleh', 'tidak', 'dalam', 'lebih', 'bisa', 'agar', 'namun', 'bagi',
+    'tersebut', 'saat', 'masih', 'telah', 'bahwa', 'hanya', 'saja', 'mereka',
+    'kami', 'kita', 'anda', 'saya', 'dia', 'ia', 'apa', 'siapa', 'mengapa',
+    'bagaimana', 'kapan', 'dimana', 'jadi', 'lagi', 'lah', 'pun', 'nah',
+    'ya', 'oh', 'eh', 'hmm', 'huh', 'wow', 'wah', 'uh', 'ehh', 'ohh', 'yaa',
+    'nahh', 'pun', 'pula', 'lagi', 'lah', 'kah', 'tuh', 'deh', 'dong', 'sih',
+    'toh', 'kok', 'kan', 'nya', 'ku', 'mu', 'kau', 'gua', 'gue', 'elo', 'lu',
+    'loe', 'loh', 'lho', 'nih'
+}
+filler_words = {"eh", "hmm", "gitu", "apa", "ya", "kayak", "jadi", "nah", "anu", "gini"}
 
-# ----------------------------
-# Fungsi Pembersih Teks
-# ----------------------------
-filler_words_list = ['eh', 'hmm', 'em', 'gitu', 'apa ya', 'gimana ya', 'kayak', 'anu']
+# ------------------------
+# Fungsi Pemrosesan
+# ------------------------
+def bersihkan_teks(teks):
+    teks = re.sub(r'[^a-zA-Z\s]', '', teks).lower()
+    kata = teks.split()
+    return [k for k in kata if k not in stopwords_id and len(k) > 2]
 
-def clean_text(text):
-    text = text.lower()
-    text = re.sub(r'\d+', '', text)
-    text = text.translate(str.maketrans('', '', string.punctuation))
-    return text
+def hitung_filler(teks):
+    teks = teks.lower()
+    return {fw: teks.split().count(fw) for fw in filler_words if fw in teks}
 
-def remove_stopwords(words):
-    stop_words = set(stopwords.words('indonesian'))
-    return [word for word in words if word not in stop_words and len(word) > 1]
-
-def detect_filler_words(words):
-    return {word: words.count(word) for word in filler_words_list if word in words}
-
-def get_sentiment(text):
-    # Dummy sentiment detection based on keywords (you can replace this later)
-    if any(word in text for word in ['bagus', 'senang', 'baik']):
-        return 'positif'
-    elif any(word in text for word in ['jelek', 'buruk', 'sedih']):
-        return 'negatif'
+def dummy_sentimen(teks):
+    if "senang" in teks or "bagus" in teks:
+        return "positif"
+    elif "buruk" in teks or "jelek" in teks:
+        return "negatif"
     else:
-        return 'netral'
+        return "netral"
 
-# ----------------------------
-# Scraping Transkrip
-# ----------------------------
-@st.cache_data(show_spinner=True)
-def ambil_transkrip(video_id):
-    data = YouTubeTranscriptApi.get_transcript(video_id, languages=['id', 'en'])
-    hasil = []
-    for segmen in data:
-        teks = clean_text(segmen['text'])
-        kata = teks.split()
-        kata_bersih = remove_stopwords(kata)
-        filler_dict = detect_filler_words(kata)
-        hasil.append({
-            "video_id": video_id,
-            "start": segmen['start'],
-            "duration": segmen['duration'],
-            "teks": segmen['text'],
-            "kata_bersih": kata_bersih,
-            "filler_words": filler_dict,
-            "sentimen": get_sentiment(teks)
-        })
-    return hasil
+def scrap_dan_simpan(video_id, judul):
+    if col.find_one({"video_id": video_id}):
+        return
 
-# ----------------------------
-# Streamlit App
-# ----------------------------
-st.set_page_config(page_title="TalkTrainer App", layout="wide")
-st.title("🎤 Analisis Transkrip Public Speaking dari YouTube")
+    try:
+        transkrip = YouTubeTranscriptApi.get_transcript(video_id, languages=['id'])
+        for seg in transkrip:
+            teks = seg["text"]
+            kata_bersih = bersihkan_teks(teks)
+            filler = hitung_filler(teks)
+            sentimen = dummy_sentimen(teks)
 
-video_id = st.text_input("Masukkan ID video YouTube:", value="eZy8ESSjbrQ")
+            doc = {
+                "video_id": video_id,
+                "judul": judul,
+                "start": seg["start"],
+                "duration": seg["duration"],
+                "teks": teks,
+                "kata_bersih": kata_bersih,
+                "filler_words": filler,
+                "sentimen": sentimen
+            }
+            col.insert_one(doc)
+    except Exception as e:
+        st.error(f"Gagal scraping: {e}")
 
-if st.button("Mulai Analisis"):
-    with st.spinner("Mengambil dan memproses transkrip..."):
-        hasil = ambil_transkrip(video_id)
+# ------------------------
+# Konstanta Video
+# ------------------------
+video_id = "eZy8ESSjbrQ"
+judul = "Contoh Latihan Public Speaking"
 
-        # Simpan ke MongoDB
-        col.delete_many({"video_id": video_id})  # hapus data lama
-        col.insert_many(hasil)
+# ------------------------
+# Streamlit Layout
+# ------------------------
+st.set_page_config(page_title="Present APP", layout="wide")
+st.title("🎤 Analisis Public Speaking dari Video YouTube")
+st.markdown(f"**Video:** [{judul}](https://www.youtube.com/watch?v={video_id})")
 
-        st.success("Data berhasil diambil dan disimpan!")
+# ------------------------
+# Scraping Jika Belum Ada
+# ------------------------
+if not col.find_one({"video_id": video_id}):
+    with st.spinner("Sedang mengambil dan memproses transkrip..."):
+        scrap_dan_simpan(video_id, judul)
+    st.success("✅ Data berhasil disiapkan.")
 
-# ----------------------------
-# Visualisasi Data
-# ----------------------------
+# ------------------------
+# Ambil dan Analisis Data
+# ------------------------
 segmen = list(col.find({"video_id": video_id}))
-if segmen:
-    st.header("📊 Hasil Analisis")
 
-    kata_bersih = []
-    filler_counter = Counter()
-    sentimen_counter = Counter()
+if not segmen:
+    st.warning("Tidak ada data transkrip.")
+    st.stop()
 
-    for s in segmen:
-        kata_bersih.extend(s["kata_bersih"])
-        filler_counter.update(s["filler_words"])
-        sentimen_counter[s["sentimen"]] += 1
+kata_bersih = []
+filler_counter = Counter()
+sentimen_counter = Counter()
 
-    kata_freq = Counter(kata_bersih).most_common(20)
+for s in segmen:
+    kata_bersih.extend(s.get("kata_bersih", []))
+    filler_counter.update(s.get("filler_words", {}))
+    sentimen_counter[s.get("sentimen", "netral")] += 1
 
-    # Wordcloud
-    st.subheader("☁️ WordCloud")
-    if kata_bersih:
-        teks = " ".join(kata_bersih)
-        wc = WordCloud(width=800, height=400, background_color='white').generate(teks)
-        fig, ax = plt.subplots(figsize=(10, 5))
-        ax.imshow(wc, interpolation='bilinear')
-        ax.axis("off")
-        st.pyplot(fig)
-    else:
-        st.info("Tidak ada kata yang bisa digunakan untuk membuat WordCloud.")
+kata_freq = Counter(kata_bersih).most_common(20)
 
-    # Chart kata populer
-    st.subheader("📈 20 Kata Paling Sering Muncul")
-    if kata_freq:
-        kata, jumlah = zip(*kata_freq)
-        fig, ax = plt.subplots()
-        ax.barh(kata, jumlah, color='skyblue')
-        ax.invert_yaxis()
-        st.pyplot(fig)
+# ------------------------
+# Wordcloud
+# ------------------------
+st.subheader("☁️ WordCloud dari Transkrip")
+wc = WordCloud(width=800, height=400, background_color='white').generate(" ".join(kata_bersih))
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.imshow(wc, interpolation='bilinear')
+ax.axis("off")
+st.pyplot(fig)
 
-    # Chart filler word
-    st.subheader("🗣️ Analisis Filler Word")
-    if filler_counter:
-        kata, jumlah = zip(*filler_counter.most_common())
-        fig, ax = plt.subplots()
-        ax.bar(kata, jumlah, color='orange')
-        st.pyplot(fig)
+# ------------------------
+# Trending Topic
+# ------------------------
+st.subheader("📈 20 Kata Paling Sering Muncul")
+kata, jumlah = zip(*kata_freq)
+fig, ax = plt.subplots()
+ax.barh(kata, jumlah, color='skyblue')
+ax.invert_yaxis()
+st.pyplot(fig)
 
-    # Chart sentimen
-    st.subheader("😊 Analisis Sentimen")
-    if sentimen_counter:
-        label, jumlah = zip(*sentimen_counter.items())
-        fig, ax = plt.subplots()
-        ax.barh(label, jumlah, color='lightgreen')
-        st.pyplot(fig)
+# ------------------------
+# Filler Word Analysis
+# ------------------------
+st.subheader("🎤 Analisis Filler Words")
+if filler_counter:
+    kata, jumlah = zip(*filler_counter.most_common())
+    fig, ax = plt.subplots()
+    ax.bar(kata, jumlah, color='orange')
+    ax.set_title("Jumlah Kemunculan Filler Words")
+    st.pyplot(fig)
+else:
+    st.info("Tidak ditemukan filler word.")
 
-    # Tampilkan segmen
-    st.subheader("📄 Contoh Segmen Transkrip")
-    for s in segmen[:5]:
-        st.markdown(f"**Waktu: {round(s['start'], 2)} detik**")
-        st.text(s["teks"])
+# ------------------------
+# Sentiment Chart
+# ------------------------
+st.subheader("😊 Analisis Sentimen Emosional")
+if sentimen_counter:
+    labels, counts = zip(*sentimen_counter.items())
+    fig, ax = plt.subplots()
+    ax.barh(labels, counts, color='lightcoral')
+    ax.set_xlabel("Jumlah Segmen")
+    ax.set_title("Distribusi Sentimen Emosional")
+    st.pyplot(fig)
+else:
+    st.info("Tidak ditemukan analisis sentimen.")
+
+# ------------------------
+# Contoh Segmen
+# ------------------------
+st.subheader("🧾 Contoh Segmen Transkrip")
+for s in segmen[:5]:
+    st.markdown(f"**Waktu: {round(s['start'], 2)} detik**")
+    st.text(s["teks"])
