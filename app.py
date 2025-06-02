@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 from pymongo import MongoClient
 from collections import Counter
@@ -13,7 +12,6 @@ mongo_uri = st.secrets["mongo"]["uri"]  # Gunakan secrets.toml
 client = MongoClient(mongo_uri)
 db = client["scrapingbig"]
 col = db["users"]
-
 
 # ------------------------
 # Konfigurasi Streamlit
@@ -50,14 +48,19 @@ kata_freq = Counter(kata_bersih).most_common(20)
 st.subheader("☁️ WordCloud dari Transkrip")
 
 def tampilkan_wordcloud(kata):
-    if not kata:
-        st.warning("Data kata kosong. Tidak dapat membuat WordCloud.")
+    # Filter kata yang valid (string dan bukan kosong)
+    kata_filter = [k for k in kata if isinstance(k, str) and k.strip()]
+    if not kata_filter:
+        st.warning("Data kata kosong atau tidak valid. Tidak dapat membuat WordCloud.")
         return
-    wc = WordCloud(width=800, height=400, background_color='white').generate(" ".join(kata))
+    wc = WordCloud(width=800, height=400, background_color='white').generate(" ".join(kata_filter))
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.imshow(wc, interpolation='bilinear')
     ax.axis("off")
     st.pyplot(fig)
+
+st.write("Jumlah kata bersih:", len(kata_bersih))
+st.write("Contoh kata bersih:", kata_bersih[:10])
 
 if kata_bersih:
     tampilkan_wordcloud(kata_bersih)
