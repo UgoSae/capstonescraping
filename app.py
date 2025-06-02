@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 from pymongo import MongoClient
 from collections import Counter
@@ -8,11 +7,11 @@ from youtube_transcript_api import YouTubeTranscriptApi
 import re
 
 # ------------------------
-# MongoDB Setup
+# MongoDB Setup (Atlas via Streamlit Secrets)
 # ------------------------
-client = MongoClient("mongodb://localhost:27017/")
-db = client["present_db"]
-col = db["segmen_transkrip"]
+client = MongoClient(st.secrets["MONGO_URI"])
+db = client["capstonescraping"]
+col = db["users"]
 
 # ------------------------
 # Stopwords & Filler Words
@@ -53,7 +52,7 @@ def dummy_sentimen(teks):
 
 def scrap_dan_simpan(video_id, judul):
     if col.find_one({"video_id": video_id}):
-        print("Data untuk video ini sudah ada.")
+        st.info("Data untuk video ini sudah ada di database.")
         return
 
     try:
@@ -76,12 +75,12 @@ def scrap_dan_simpan(video_id, judul):
             }
             col.insert_one(doc)
 
-        print("✅ Scraping dan penyimpanan selesai.")
+        st.success("✅ Scraping dan penyimpanan selesai.")
     except Exception as e:
-        print(f"Gagal scraping: {e}")
+        st.error(f"Gagal scraping: {e}")
 
 # ------------------------
-# Scraping satu video saja
+# Scraping satu video saja (hanya jika belum ada)
 # ------------------------
 video_id = "eZy8ESSjbrQ"
 judul = "Public Speaking Training"
@@ -93,7 +92,7 @@ if not col.find_one({"video_id": video_id}):
 # Streamlit Layout
 # ------------------------
 st.set_page_config(page_title="Present APP", layout="wide")
-st.title("🎤 Analisis Public Speaking dari Video YouTube Berjudul Contoh Laihan Public Speaking (https://www.youtube.com/watch?v=eZy8ESSjbrQ)")
+st.title("🎤 Analisis Public Speaking dari Video YouTube")
 
 segmen = list(col.find({"video_id": video_id}))
 
