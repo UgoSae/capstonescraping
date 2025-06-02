@@ -59,7 +59,10 @@ def tampilkan_wordcloud(kata):
     ax.axis("off")
     st.pyplot(fig)
 
-tampilkan_wordcloud(kata_bersih)
+if kata_bersih:
+    tampilkan_wordcloud(kata_bersih)
+else:
+    st.warning("❗Data kata bersih kosong. Tidak bisa membuat WordCloud.")
 
 # ------------------------
 # Trending Topic
