@@ -1,5 +1,6 @@
 streamlit
 pymongo
+youtube-transcript-api
+nltk
 wordcloud
 matplotlib
-youtube-transcript-api
