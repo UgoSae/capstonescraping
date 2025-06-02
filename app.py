@@ -10,8 +10,8 @@ import re
 # Koneksi MongoDB Atlas
 # ------------------------
 client = MongoClient(st.secrets["MONGODB_URI"])
-db = client["present_db"]
-col = db["segmen_transkrip"]
+db = client["scrapingbig"]
+col = db["users"]
 
 # ------------------------
 # Stopwords & Filler Words
