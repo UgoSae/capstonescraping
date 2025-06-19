@@ -96,43 +96,13 @@ if not segmen:
     st.stop()
 
 # ------------------------
-# Filter Dropdown
-# ------------------------
-st.subheader("🎛️ Filter")
-
-opsi_sentimen = ["semua", "positif", "netral", "negatif"]
-sentimen_terpilih = st.selectbox("Pilih sentimen:", opsi_sentimen)
-
-# Ambil semua kata bersih unik dari semua segmen
-semua_kata = set()
-for s in segmen:
-    semua_kata.update(s.get("kata_bersih", []))
-daftar_kata = sorted(list(semua_kata))
-kata_terpilih = st.selectbox("Pilih kata:", ["(semua)"] + daftar_kata)
-
-# ------------------------
-# Terapkan Filter
-# ------------------------
-segmen_terfilter = segmen
-
-if sentimen_terpilih != "semua":
-    segmen_terfilter = [s for s in segmen_terfilter if s.get("sentimen") == sentimen_terpilih]
-
-if kata_terpilih != "(semua)":
-    segmen_terfilter = [s for s in segmen_terfilter if kata_terpilih in s.get("kata_bersih", [])]
-
-if not segmen_terfilter:
-    st.warning("Tidak ada segmen yang cocok dengan filter.")
-    st.stop()
-
-# ------------------------
 # Analisis
 # ------------------------
 kata_bersih = []
 filler_counter = Counter()
 sentimen_counter = Counter()
 
-for s in segmen_terfilter:
+for s in segmen:
     kata_bersih.extend(s.get("kata_bersih", []))
     filler_counter.update(s.get("filler_words", {}))
     sentimen_counter[s.get("sentimen", "netral")] += 1
@@ -157,7 +127,7 @@ if kata_freq:
     ax.invert_yaxis()
     st.pyplot(fig)
 else:
-    st.info("Tidak ada kata dominan pada hasil filter.")
+    st.info("Tidak ada kata dominan.")
 
 st.subheader("🎤 Analisis Filler Words")
 if filler_counter:
@@ -181,9 +151,29 @@ else:
     st.info("Tidak ditemukan analisis sentimen.")
 
 # ------------------------
-# Contoh Segmen
+# Filter & Contoh Segmen
 # ------------------------
 st.subheader("🧾 Contoh Segmen Transkrip")
-for s in segmen_terfilter[:5]:
-    st.markdown(f"**Waktu: {round(s['start'], 2)} detik**")
-    st.text(s["teks"])
+
+opsi_sentimen = ["semua", "positif", "netral", "negatif"]
+sentimen_terpilih = st.selectbox("Filter sentimen:", opsi_sentimen)
+
+semua_kata = set()
+for s in segmen:
+    semua_kata.update(s.get("kata_bersih", []))
+daftar_kata = sorted(list(semua_kata))
+kata_terpilih = st.selectbox("Filter kata:", ["(semua)"] + daftar_kata)
+
+segmen_terfilter = segmen
+
+if sentimen_terpilih != "semua":
+    segmen_terfilter = [s for s in segmen_terfilter if s.get("sentimen") == sentimen_terpilih]
+if kata_terpilih != "(semua)":
+    segmen_terfilter = [s for s in segmen_terfilter if kata_terpilih in s.get("kata_bersih", [])]
+
+if not segmen_terfilter:
+    st.warning("Tidak ada segmen yang cocok dengan filter.")
+else:
+    for s in segmen_terfilter[:5]:
+        st.markdown(f"**Waktu: {round(s['start'], 2)} detik**")
+        st.text(s["teks"])
