@@ -110,15 +110,30 @@ for s in segmen:
 kata_freq = Counter(kata_bersih).most_common(20)
 
 # ------------------------
-# Visualisasi
+# Wordcloud + Filter Kata
 # ------------------------
 st.subheader("☁️ WordCloud dari Transkrip")
-wc = WordCloud(width=800, height=400, background_color='white').generate(" ".join(kata_bersih))
-fig, ax = plt.subplots(figsize=(10, 5))
-ax.imshow(wc, interpolation='bilinear')
-ax.axis("off")
-st.pyplot(fig)
 
+semua_kata = set()
+for s in segmen:
+    semua_kata.update(s.get("kata_bersih", []))
+daftar_kata = sorted(list(semua_kata))
+kata_terpilih = st.selectbox("Filter kata untuk WordCloud:", ["(semua)"] + daftar_kata)
+
+filtered_kata = kata_bersih if kata_terpilih == "(semua)" else [k for k in kata_bersih if k == kata_terpilih]
+
+if filtered_kata:
+    wc = WordCloud(width=800, height=400, background_color='white').generate(" ".join(filtered_kata))
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.imshow(wc, interpolation='bilinear')
+    ax.axis("off")
+    st.pyplot(fig)
+else:
+    st.info("Tidak ada kata untuk ditampilkan pada WordCloud.")
+
+# ------------------------
+# Trending Topic
+# ------------------------
 st.subheader("📈 20 Kata Paling Sering Muncul")
 if kata_freq:
     kata, jumlah = zip(*kata_freq)
@@ -129,6 +144,9 @@ if kata_freq:
 else:
     st.info("Tidak ada kata dominan.")
 
+# ------------------------
+# Filler Word Analysis
+# ------------------------
 st.subheader("🎤 Analisis Filler Words")
 if filler_counter:
     kata, jumlah = zip(*filler_counter.most_common())
@@ -139,9 +157,19 @@ if filler_counter:
 else:
     st.info("Tidak ditemukan filler word.")
 
+# ------------------------
+# Sentiment Chart + Filter Sentimen
+# ------------------------
 st.subheader("😊 Analisis Sentimen Emosional")
-if sentimen_counter:
-    labels, counts = zip(*sentimen_counter.items())
+
+opsi_sentimen = ["semua", "positif", "netral", "negatif"]
+sentimen_terpilih = st.selectbox("Filter sentimen untuk analisis:", opsi_sentimen)
+
+filtered_segmen = segmen if sentimen_terpilih == "semua" else [s for s in segmen if s.get("sentimen") == sentimen_terpilih]
+filtered_sentimen_counter = Counter([s.get("sentimen", "netral") for s in filtered_segmen])
+
+if filtered_sentimen_counter:
+    labels, counts = zip(*filtered_sentimen_counter.items())
     fig, ax = plt.subplots()
     ax.barh(labels, counts, color='lightcoral')
     ax.set_xlabel("Jumlah Segmen")
@@ -151,29 +179,9 @@ else:
     st.info("Tidak ditemukan analisis sentimen.")
 
 # ------------------------
-# Filter & Contoh Segmen
+# Contoh Segmen
 # ------------------------
 st.subheader("🧾 Contoh Segmen Transkrip")
-
-opsi_sentimen = ["semua", "positif", "netral", "negatif"]
-sentimen_terpilih = st.selectbox("Filter sentimen:", opsi_sentimen)
-
-semua_kata = set()
-for s in segmen:
-    semua_kata.update(s.get("kata_bersih", []))
-daftar_kata = sorted(list(semua_kata))
-kata_terpilih = st.selectbox("Filter kata:", ["(semua)"] + daftar_kata)
-
-segmen_terfilter = segmen
-
-if sentimen_terpilih != "semua":
-    segmen_terfilter = [s for s in segmen_terfilter if s.get("sentimen") == sentimen_terpilih]
-if kata_terpilih != "(semua)":
-    segmen_terfilter = [s for s in segmen_terfilter if kata_terpilih in s.get("kata_bersih", [])]
-
-if not segmen_terfilter:
-    st.warning("Tidak ada segmen yang cocok dengan filter.")
-else:
-    for s in segmen_terfilter[:5]:
-        st.markdown(f"**Waktu: {round(s['start'], 2)} detik**")
-        st.text(s["teks"])
+for s in filtered_segmen[:5]:
+    st.markdown(f"**Waktu: {round(s['start'], 2)} detik**")
+    st.text(s["teks"])
