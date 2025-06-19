@@ -6,8 +6,17 @@ import matplotlib.pyplot as plt
 from youtube_transcript_api import YouTubeTranscriptApi
 import re
 
-# Tambahan: stopwords otomatis dari Sastrawi
+# ------------------------
+# Stopwords dari Sastrawi
+# ------------------------
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
+
+factory = StopWordRemoverFactory()
+stopwords_id = set(factory.get_stop_words())
+
+# Tambahkan filler word sebagai tambahan stopword
+filler_words = {"eh", "hmm", "gitu", "apa", "ya", "kayak", "jadi", "nah", "anu", "gini"}
+stopwords_id.update(filler_words)
 
 # ------------------------
 # Koneksi MongoDB Atlas
@@ -15,15 +24,6 @@ from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFacto
 client = MongoClient(st.secrets["MONGODB_URI"])
 db = client["scrapingbig"]
 col = db["users"]
-
-# ------------------------
-# Stopwords & Filler Words
-# ------------------------
-factory = StopWordRemoverFactory()
-stopwords_id = set(factory.get_stop_words()).union({
-    "eh", "hmm", "gitu", "apa", "ya", "kayak", "jadi", "nah", "anu", "gini"
-})
-filler_words = {"eh", "hmm", "gitu", "apa", "ya", "kayak", "jadi", "nah", "anu", "gini"}
 
 # ------------------------
 # Fungsi Pemrosesan
