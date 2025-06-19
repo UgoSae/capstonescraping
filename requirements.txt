@@ -1,6 +1,6 @@
 streamlit
 pymongo
 youtube-transcript-api
-nltk
+Sastrawi
 wordcloud
 matplotlib
