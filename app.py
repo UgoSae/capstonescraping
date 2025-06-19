@@ -6,20 +6,18 @@ import matplotlib.pyplot as plt
 from youtube_transcript_api import YouTubeTranscriptApi
 import re
 
-# ------------------------
-# Stopwords dari Sastrawi
-# ------------------------
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
 
+# ------------------------
+# Stopwords & Filler
+# ------------------------
 factory = StopWordRemoverFactory()
 stopwords_id = set(factory.get_stop_words())
-
-# Tambahan stopword: filler
 filler_words = {"eh", "hmm", "gitu", "apa", "ya", "kayak", "jadi", "nah", "anu", "gini"}
 stopwords_id.update(filler_words)
 
 # ------------------------
-# Koneksi MongoDB Atlas
+# MongoDB
 # ------------------------
 client = MongoClient(st.secrets["MONGODB_URI"])
 db = client["scrapingbig"]
@@ -72,28 +70,14 @@ def scrap_dan_simpan(video_id, judul):
         st.error(f"Gagal scraping: {e}")
 
 # ------------------------
-# Konstanta Video
+# Video
 # ------------------------
 video_id = "eZy8ESSjbrQ"
 judul = "Contoh Latihan Public Speaking"
 
-# ------------------------
-# Streamlit Layout
-# ------------------------
 st.set_page_config(page_title="Present APP", layout="wide")
 st.title("🎤 Analisis Public Speaking dari Video YouTube")
 st.markdown(f"**Video:** [{judul}](https://www.youtube.com/watch?v={video_id})")
-
-# ------------------------
-# Sidebar Filter
-# ------------------------
-st.sidebar.header("🔍 Filter Transkrip")
-sentimen_pilihan = st.sidebar.multiselect(
-    "Filter berdasarkan sentimen:",
-    ["positif", "netral", "negatif"],
-    default=["positif", "netral", "negatif"]
-)
-keyword = st.sidebar.text_input("Cari kata di dalam segmen:", "").lower()
 
 # ------------------------
 # Scraping Jika Belum Ada
@@ -104,26 +88,51 @@ if not col.find_one({"video_id": video_id}):
     st.success("✅ Data berhasil disiapkan.")
 
 # ------------------------
-# Ambil dan Filter Data
+# Ambil Data
 # ------------------------
 segmen = list(col.find({"video_id": video_id}))
-segmen = [s for s in segmen if s.get("sentimen", "netral") in sentimen_pilihan]
-
-if keyword:
-    segmen = [s for s in segmen if keyword in s.get("teks", "").lower()]
-
 if not segmen:
+    st.warning("Tidak ada data transkrip.")
+    st.stop()
+
+# ------------------------
+# Sidebar Filter (Dropdown)
+# ------------------------
+st.sidebar.header("🎛️ Filter Transkrip")
+
+opsi_sentimen = ["semua", "positif", "netral", "negatif"]
+sentimen_terpilih = st.sidebar.selectbox("Pilih sentimen:", opsi_sentimen)
+
+# Ambil semua kata bersih unik dari semua segmen
+semua_kata = set()
+for s in segmen:
+    semua_kata.update(s.get("kata_bersih", []))
+daftar_kata = sorted(list(semua_kata))
+kata_terpilih = st.sidebar.selectbox("Pilih kata:", ["(semua)"] + daftar_kata)
+
+# ------------------------
+# Terapkan Filter
+# ------------------------
+segmen_terfilter = segmen
+
+if sentimen_terpilih != "semua":
+    segmen_terfilter = [s for s in segmen_terfilter if s.get("sentimen") == sentimen_terpilih]
+
+if kata_terpilih != "(semua)":
+    segmen_terfilter = [s for s in segmen_terfilter if kata_terpilih in s.get("kata_bersih", [])]
+
+if not segmen_terfilter:
     st.warning("Tidak ada segmen yang cocok dengan filter.")
     st.stop()
 
 # ------------------------
-# Proses Analisis
+# Analisis
 # ------------------------
 kata_bersih = []
 filler_counter = Counter()
 sentimen_counter = Counter()
 
-for s in segmen:
+for s in segmen_terfilter:
     kata_bersih.extend(s.get("kata_bersih", []))
     filler_counter.update(s.get("filler_words", {}))
     sentimen_counter[s.get("sentimen", "netral")] += 1
@@ -131,7 +140,7 @@ for s in segmen:
 kata_freq = Counter(kata_bersih).most_common(20)
 
 # ------------------------
-# Wordcloud
+# Visualisasi
 # ------------------------
 st.subheader("☁️ WordCloud dari Transkrip")
 wc = WordCloud(width=800, height=400, background_color='white').generate(" ".join(kata_bersih))
@@ -140,19 +149,16 @@ ax.imshow(wc, interpolation='bilinear')
 ax.axis("off")
 st.pyplot(fig)
 
-# ------------------------
-# Trending Topic
-# ------------------------
 st.subheader("📈 20 Kata Paling Sering Muncul")
-kata, jumlah = zip(*kata_freq)
-fig, ax = plt.subplots()
-ax.barh(kata, jumlah, color='skyblue')
-ax.invert_yaxis()
-st.pyplot(fig)
+if kata_freq:
+    kata, jumlah = zip(*kata_freq)
+    fig, ax = plt.subplots()
+    ax.barh(kata, jumlah, color='skyblue')
+    ax.invert_yaxis()
+    st.pyplot(fig)
+else:
+    st.info("Tidak ada kata dominan pada hasil filter.")
 
-# ------------------------
-# Filler Word Analysis
-# ------------------------
 st.subheader("🎤 Analisis Filler Words")
 if filler_counter:
     kata, jumlah = zip(*filler_counter.most_common())
@@ -163,9 +169,6 @@ if filler_counter:
 else:
     st.info("Tidak ditemukan filler word.")
 
-# ------------------------
-# Sentiment Chart
-# ------------------------
 st.subheader("😊 Analisis Sentimen Emosional")
 if sentimen_counter:
     labels, counts = zip(*sentimen_counter.items())
@@ -181,6 +184,6 @@ else:
 # Contoh Segmen
 # ------------------------
 st.subheader("🧾 Contoh Segmen Transkrip")
-for s in segmen[:5]:
+for s in segmen_terfilter[:5]:
     st.markdown(f"**Waktu: {round(s['start'], 2)} detik**")
     st.text(s["teks"])
