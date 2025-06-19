@@ -96,19 +96,19 @@ if not segmen:
     st.stop()
 
 # ------------------------
-# Sidebar Filter (Dropdown)
+# Filter Dropdown
 # ------------------------
-st.sidebar.header("🎛️ Filter Transkrip")
+st.subheader("🎛️ Filter")
 
 opsi_sentimen = ["semua", "positif", "netral", "negatif"]
-sentimen_terpilih = st.sidebar.selectbox("Pilih sentimen:", opsi_sentimen)
+sentimen_terpilih = st.selectbox("Pilih sentimen:", opsi_sentimen)
 
 # Ambil semua kata bersih unik dari semua segmen
 semua_kata = set()
 for s in segmen:
     semua_kata.update(s.get("kata_bersih", []))
 daftar_kata = sorted(list(semua_kata))
-kata_terpilih = st.sidebar.selectbox("Pilih kata:", ["(semua)"] + daftar_kata)
+kata_terpilih = st.selectbox("Pilih kata:", ["(semua)"] + daftar_kata)
 
 # ------------------------
 # Terapkan Filter
