@@ -53,7 +53,11 @@ def scrap_dan_simpan(video_id, judul):
             teks = seg["text"]
             kata_bersih = bersihkan_teks(teks)
             filler = hitung_filler(teks)
+            jumlah_kata = len(teks.split())
+            jumlah_filler = sum(filler.values())
+            kecepatan_bicara = round(jumlah_kata / (seg["duration"] / 60), 2) if seg["duration"] > 0 else 0.0
             sentimen = dummy_sentimen(teks)
+            topik = kata_bersih[:3]
 
             doc = {
                 "video_id": video_id,
@@ -63,7 +67,11 @@ def scrap_dan_simpan(video_id, judul):
                 "teks": teks,
                 "kata_bersih": kata_bersih,
                 "filler_words": filler,
-                "sentimen": sentimen
+                "jumlah_kata": jumlah_kata,
+                "jumlah_filler": jumlah_filler,
+                "kecepatan_bicara": kecepatan_bicara,
+                "sentimen": sentimen,
+                "topik": topik
             }
             col.insert_one(doc)
     except Exception as e:
@@ -183,5 +191,6 @@ else:
 # ------------------------
 st.subheader("🧾 Contoh Segmen Transkrip")
 for s in filtered_segmen[:5]:
-    st.markdown(f"**Waktu: {round(s['start'], 2)} detik**")
+    st.markdown(f"**Waktu: {round(s['start'], 2)} detik | Durasi: {round(s['duration'], 1)} detik**")
+    st.markdown(f"**Jumlah Kata:** {s.get('jumlah_kata')} | **Filler:** {s.get('jumlah_filler')} | **WPM:** {s.get('kecepatan_bicara')} | **Topik:** {', '.join(s.get('topik', []))}")
     st.text(s["teks"])
