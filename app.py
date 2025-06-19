@@ -14,7 +14,7 @@ from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFacto
 factory = StopWordRemoverFactory()
 stopwords_id = set(factory.get_stop_words())
 
-# Tambahkan filler word sebagai tambahan stopword
+# Tambahan stopword: filler
 filler_words = {"eh", "hmm", "gitu", "apa", "ya", "kayak", "jadi", "nah", "anu", "gini"}
 stopwords_id.update(filler_words)
 
@@ -85,6 +85,17 @@ st.title("🎤 Analisis Public Speaking dari Video YouTube")
 st.markdown(f"**Video:** [{judul}](https://www.youtube.com/watch?v={video_id})")
 
 # ------------------------
+# Sidebar Filter
+# ------------------------
+st.sidebar.header("🔍 Filter Transkrip")
+sentimen_pilihan = st.sidebar.multiselect(
+    "Filter berdasarkan sentimen:",
+    ["positif", "netral", "negatif"],
+    default=["positif", "netral", "negatif"]
+)
+keyword = st.sidebar.text_input("Cari kata di dalam segmen:", "").lower()
+
+# ------------------------
 # Scraping Jika Belum Ada
 # ------------------------
 if not col.find_one({"video_id": video_id}):
@@ -93,14 +104,21 @@ if not col.find_one({"video_id": video_id}):
     st.success("✅ Data berhasil disiapkan.")
 
 # ------------------------
-# Ambil dan Analisis Data
+# Ambil dan Filter Data
 # ------------------------
 segmen = list(col.find({"video_id": video_id}))
+segmen = [s for s in segmen if s.get("sentimen", "netral") in sentimen_pilihan]
+
+if keyword:
+    segmen = [s for s in segmen if keyword in s.get("teks", "").lower()]
 
 if not segmen:
-    st.warning("Tidak ada data transkrip.")
+    st.warning("Tidak ada segmen yang cocok dengan filter.")
     st.stop()
 
+# ------------------------
+# Proses Analisis
+# ------------------------
 kata_bersih = []
 filler_counter = Counter()
 sentimen_counter = Counter()
