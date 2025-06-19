@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 from youtube_transcript_api import YouTubeTranscriptApi
 import re
 
+# Tambahan: stopwords otomatis dari Sastrawi
+from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
+
 # ------------------------
 # Koneksi MongoDB Atlas
 # ------------------------
@@ -16,18 +19,10 @@ col = db["users"]
 # ------------------------
 # Stopwords & Filler Words
 # ------------------------
-stopwords_id = {
-    'yang', 'dan', 'di', 'ke', 'dari', 'pada', 'untuk', 'dengan', 'akan',
-    'ini', 'itu', 'adalah', 'atau', 'juga', 'karena', 'sudah', 'sebagai',
-    'oleh', 'tidak', 'dalam', 'lebih', 'bisa', 'agar', 'namun', 'bagi',
-    'tersebut', 'saat', 'masih', 'telah', 'bahwa', 'hanya', 'saja', 'mereka',
-    'kami', 'kita', 'anda', 'saya', 'dia', 'ia', 'apa', 'siapa', 'mengapa',
-    'bagaimana', 'kapan', 'dimana', 'jadi', 'lagi', 'lah', 'pun', 'nah',
-    'ya', 'oh', 'eh', 'hmm', 'huh', 'wow', 'wah', 'uh', 'ehh', 'ohh', 'yaa',
-    'nahh', 'pun', 'pula', 'lagi', 'lah', 'kah', 'tuh', 'deh', 'dong', 'sih',
-    'toh', 'kok', 'kan', 'nya', 'ku', 'mu', 'kau', 'gua', 'gue', 'elo', 'lu',
-    'loe', 'loh', 'lho', 'nih'
-}
+factory = StopWordRemoverFactory()
+stopwords_id = set(factory.get_stop_words()).union({
+    "eh", "hmm", "gitu", "apa", "ya", "kayak", "jadi", "nah", "anu", "gini"
+})
 filler_words = {"eh", "hmm", "gitu", "apa", "ya", "kayak", "jadi", "nah", "anu", "gini"}
 
 # ------------------------
@@ -98,37 +93,14 @@ if not col.find_one({"video_id": video_id}):
     st.success("✅ Data berhasil disiapkan.")
 
 # ------------------------
-# Sidebar Filtering UI
+# Ambil dan Analisis Data
 # ------------------------
-st.sidebar.header("🎛️ Filter Analisis")
-filter_sentimen = st.sidebar.multiselect(
-    "Filter Sentimen:",
-    options=["positif", "netral", "negatif"],
-    default=["positif", "netral", "negatif"]
-)
-tampilkan_filler_only = st.sidebar.checkbox("Hanya tampilkan segmen dengan filler word")
-filter_keyword = st.sidebar.text_input("Cari kata tertentu (opsional):").lower()
-
-# ------------------------
-# Ambil dan Filter Data
-# ------------------------
-query = {"video_id": video_id}
-segmen_all = list(col.find(query))
-
-# Terapkan filter
-segmen = [s for s in segmen_all if s.get("sentimen", "netral") in filter_sentimen]
-if tampilkan_filler_only:
-    segmen = [s for s in segmen if s.get("filler_words")]
-if filter_keyword:
-    segmen = [s for s in segmen if filter_keyword in s.get("teks", "").lower()]
+segmen = list(col.find({"video_id": video_id}))
 
 if not segmen:
-    st.warning("Tidak ada data transkrip sesuai filter.")
+    st.warning("Tidak ada data transkrip.")
     st.stop()
 
-# ------------------------
-# Analisis Kata & Filler
-# ------------------------
 kata_bersih = []
 filler_counter = Counter()
 sentimen_counter = Counter()
@@ -191,7 +163,6 @@ else:
 # Contoh Segmen
 # ------------------------
 st.subheader("🧾 Contoh Segmen Transkrip")
-st.markdown(f"**Total Segmen Ditampilkan:** {len(segmen)}")
 for s in segmen[:5]:
     st.markdown(f"**Waktu: {round(s['start'], 2)} detik**")
     st.text(s["teks"])
