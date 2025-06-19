@@ -98,14 +98,37 @@ if not col.find_one({"video_id": video_id}):
     st.success("✅ Data berhasil disiapkan.")
 
 # ------------------------
-# Ambil dan Analisis Data
+# Sidebar Filtering UI
 # ------------------------
-segmen = list(col.find({"video_id": video_id}))
+st.sidebar.header("🎛️ Filter Analisis")
+filter_sentimen = st.sidebar.multiselect(
+    "Filter Sentimen:",
+    options=["positif", "netral", "negatif"],
+    default=["positif", "netral", "negatif"]
+)
+tampilkan_filler_only = st.sidebar.checkbox("Hanya tampilkan segmen dengan filler word")
+filter_keyword = st.sidebar.text_input("Cari kata tertentu (opsional):").lower()
+
+# ------------------------
+# Ambil dan Filter Data
+# ------------------------
+query = {"video_id": video_id}
+segmen_all = list(col.find(query))
+
+# Terapkan filter
+segmen = [s for s in segmen_all if s.get("sentimen", "netral") in filter_sentimen]
+if tampilkan_filler_only:
+    segmen = [s for s in segmen if s.get("filler_words")]
+if filter_keyword:
+    segmen = [s for s in segmen if filter_keyword in s.get("teks", "").lower()]
 
 if not segmen:
-    st.warning("Tidak ada data transkrip.")
+    st.warning("Tidak ada data transkrip sesuai filter.")
     st.stop()
 
+# ------------------------
+# Analisis Kata & Filler
+# ------------------------
 kata_bersih = []
 filler_counter = Counter()
 sentimen_counter = Counter()
@@ -168,6 +191,7 @@ else:
 # Contoh Segmen
 # ------------------------
 st.subheader("🧾 Contoh Segmen Transkrip")
+st.markdown(f"**Total Segmen Ditampilkan:** {len(segmen)}")
 for s in segmen[:5]:
     st.markdown(f"**Waktu: {round(s['start'], 2)} detik**")
     st.text(s["teks"])
